@@ -3,11 +3,11 @@ import random
 import time
 from data import *
 from collections import defaultdict, Counter
-from itertools import product # yuvalk added this
+# yuvalk imports and constants
 import numpy as np
 BEFORE_WORD_MARK = '*'
 END_SENT_MARK = 'STOP'
-from operator import itemgetter
+
 def hmm_train(sents):
     """
         sents: list of tagged sentences
@@ -15,7 +15,7 @@ def hmm_train(sents):
     """
     print("Start training")
     total_tokens = 0
-    # todo was defaultdict(lambda: defaultdict(int)) - check if ok
+    # yuvalk - was defaultdict(lambda: defaultdict(int)) - should be ok
     q_tri_counts, q_bi_counts, q_uni_counts, e_word_tag_counts, e_tag_counts = [defaultdict(int) for i in range(5)]
     ### YOUR CODE HERE
     for sent in sents:
@@ -32,9 +32,7 @@ def hmm_train(sents):
             q_uni_counts[y_i] += 1
             q_bi_counts[(y_im1, y_i)] += 1
             q_tri_counts[(y_im2, y_im1, y_i)] += 1
-
             total_tokens += 1
-
     ### YOUR CODE HERE
     return total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e_word_tag_counts, q_uni_counts
 
@@ -72,6 +70,7 @@ def hmm_viterbi(sent, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
     q_cache = {}
     e_cache = {}
     l_sent = len(sent)
+
     # build pi, bp
     for k in range(l_sent):
         bp[k] = {}
@@ -91,11 +90,13 @@ def hmm_viterbi(sent, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
                 if res > pi[k][(y_im1, y_i)]:
                     pi[k][(y_im1, y_i)] = res
                     bp[k][(y_im1, y_i)] = y_im2
+        # yuvalk - hack for case that all tags have zero prob
         if len(bp[k]) == 0:
             for (y_im2, y_im1), res in pi[k-1].items():
                 for y_i in tags:
                     pi[k][(y_im1, y_i)] = res
                     bp[k][(y_im1, y_i)] = 'O'
+
     # update last and before last
     max_res = float('-inf')
     for y_im1, y_i in pi[l_sent - 1]:
@@ -179,12 +180,13 @@ if __name__ == "__main__":
     dev_sents = preprocess_sent(vocab, dev_sents)
 
     total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e_word_tag_counts, e_tag_counts = hmm_train(train_sents)
-
-    # hmm_eval(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
-    #          e_word_tag_counts, e_tag_counts, 0.04, 0.96)
+    # best lambdas are 0.12, 0.6
+    hmm_eval(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
+             e_word_tag_counts, e_tag_counts, 0.12, 0.6)
 
     # unmark to do grid or random search
-    print(lambdas_search(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
-                         e_word_tag_counts, e_tag_counts))
+    # print(lambdas_search(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
+    #                      e_word_tag_counts, e_tag_counts))
+
     train_dev_end_time = time.time()
     print("Train and dev evaluation elapsed: " + str(train_dev_end_time - start_time) + " seconds")

@@ -374,14 +374,14 @@ def preprocess_sent(vocab, sents):
     return res
 
 # find rare_words_transformation_rules not in train and removes them
-if __name__ == "__main__":
-    train_sents = read_conll_ner_file("data/train.conll")
-    vocab = compute_vocab_count(train_sents)
-    train_sents = preprocess_sent(vocab, train_sents)
-    maps = set(map for map, _ in rare_words_transformation_rules)
-    true_maps = set()
-    for sent in train_sents:
-        for word, tag in sent:
-            if word in maps:
-                true_maps.add(word)
-    print(maps.difference(true_maps))
+# if __name__ == "__main__":
+#     train_sents = read_conll_ner_file("data/train.conll")
+#     vocab = compute_vocab_count(train_sents)
+#     train_sents = preprocess_sent(vocab, train_sents)
+#     maps = set(map for map, _ in rare_words_transformation_rules)
+#     true_maps = set()
+#     for sent in train_sents:
+#         for word, tag in sent:
+#             if word in maps:
+#                 true_maps.add(word)
+#     print(maps.difference(true_maps))
