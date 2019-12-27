@@ -14,7 +14,7 @@ def build_extra_decoding_arguments(train_sents):
 
     extra_decoding_arguments = {}
     ### YOUR CODE HERE
-    raise NotImplementedError
+
     ### YOUR CODE HERE
 
     return extra_decoding_arguments
@@ -28,7 +28,27 @@ def extract_features_base(curr_word, next_word, prev_word, prevprev_word, prev_t
     features = {}
     features['word'] = curr_word
     ### YOUR CODE HERE
-    raise NotImplementedError
+    for i in range(1, 6):
+        feature_name = 'word_pref_' + str(i)
+        features[feature_name] = ''
+        if i <= len(curr_word):
+            features[feature_name] = curr_word[:i]
+            
+    for i in range(1, 6):
+        feature_name = 'word_suf_' + str(i)
+        features[feature_name] = ''
+        if i <= len(curr_word):
+            features[feature_name] = curr_word[-i:]
+            
+    def pipe_strings(s1, s2):
+        return s1 + '|' + s2
+            
+    features['tag_unigram'] = ''
+    features['tag_bigram'] = prev_tag
+    features['tag_trigram'] = pipe_strings(prevprev_tag, prev_tag)
+    features['word_tag_prev'] = pipe_strings(prev_word, prev_tag)
+    features['word_tag_prevprev'] = pipe_strings(prevprev_word, prevprev_tag)
+    
     ### YOUR CODE HERE
     return features
 
@@ -72,7 +92,12 @@ def memm_greedy(sent, logreg, vec, index_to_tag_dict, extra_decoding_arguments):
     """
     predicted_tags = ["O"] * (len(sent))
     ### YOUR CODE HERE
-    raise NotImplementedError
+    for i in range(len(sent)):
+        sentence = list(zip(sent, predicted_tags))
+        features = extract_features(sentence, i)
+        vectorized_sent = vectorize_features(vec, features)
+        index = logreg.predict(vectorized_sent)[0]
+        predicted_tags[i] = index_to_tag_dict[index]
     ### YOUR CODE HERE
     return predicted_tags
 
@@ -83,7 +108,42 @@ def memm_viterbi(sent, logreg, vec, index_to_tag_dict, extra_decoding_arguments)
     """
     predicted_tags = ["O"] * (len(sent))
     ### YOUR CODE HERE
-    raise NotImplementedError
+    num_tags = len(index_to_tag_dict) - 1
+    PI = np.zeros([len(sent), num_tags, num_tags])
+    BP_ix = np.zeros([len(sent), num_tags, num_tags])
+    for i in range(len(sent)):
+        q = np.zeros([num_tags, num_tags, num_tags])
+        for prev_tag_index in range(num_tags):
+            for prev_prev_tag_index in range(num_tags):
+                tags = ["O"] * (len(sent))
+                if i > 0:
+                    tags[i - 1] = index_to_tag_dict[prev_tag_index]
+                if i > 1:
+                    tags[i - 2] = index_to_tag_dict[prev_prev_tag_index]
+                sentence = list(zip(sent, tags))
+                features = extract_features(sentence, i)
+                vectorized_sent = vectorize_features(vec, features)
+                q[prev_prev_tag_index, prev_tag_index, :] = logreg.predict_proba(vectorized_sent)
+        if i > 0:
+            last_PI = PI[i-1]
+        else:
+            last_PI = np.ones([num_tags, num_tags])
+        last_PI = np.repeat(last_PI[:, :, np.newaxis], num_tags, axis=2)
+        r = last_PI * q
+        BP_ix[i] = np.argmax(r, axis=0)
+        PI[i] = np.max(r, axis=0)
+    last_PI = PI[len(sent) - 1]
+    argmax = last_PI.argmax()
+    curr_tag_index = argmax % num_tags
+    prev_tag_index = int(argmax / num_tags)
+    predicted_tags[-1] = index_to_tag_dict[curr_tag_index]
+    if len(sent) > 1:
+        predicted_tags[-2] = index_to_tag_dict[prev_tag_index]
+    for i in range(len(sent) - 1, 1, -1):
+        prev_prev_tag_index = BP_ix[i, prev_tag_index, curr_tag_index]
+        predicted_tags[i - 2] = index_to_tag_dict[prev_prev_tag_index]
+        curr_tag_index = prev_tag_index
+        prev_tag_index = curr_tag_index
     ### YOUR CODE HERE
     return predicted_tags
 
@@ -115,7 +175,8 @@ def memm_eval(test_data, logreg, vec, index_to_tag_dict, extra_decoding_argument
         gold_tag_seqs.append(true_tags)
 
         ### YOUR CODE HERE
-        raise NotImplementedError
+        greedy_pred_tag_seqs.append(memm_greedy(words, logreg, vec, index_to_tag_dict, extra_decoding_arguments))
+        viterbi_pred_tag_seqs.append(memm_viterbi(words, logreg, vec, index_to_tag_dict, extra_decoding_arguments))
         ### YOUR CODE HERE
 
     greedy_evaluation = evaluate_ner(gold_tag_seqs, greedy_pred_tag_seqs)
