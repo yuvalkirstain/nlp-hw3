@@ -81,7 +81,7 @@ def hmm_viterbi(sent, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
             e = e_cache[(word, y_i)]
             if e == float('-inf'):
                 continue # if emission prob is zero then prob is 0. The tags don't matter.
-            for y_im2, y_im1 in pi[k-1]:
+            for y_im2, y_im1 in pi[k-1]: # we don't iterate through all tags, just those that are a part of a possible path
                 if (y_im2, y_im1, y_i) not in q_cache:
                     q_cache[(y_im2, y_im1, y_i)] = transition(y_im2, y_im1, y_i)
                 q = q_cache[(y_im2, y_im1, y_i)]
@@ -116,7 +116,7 @@ def hmm_viterbi(sent, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
     ### YOUR CODE HERE
     return predicted_tags
 
-def hmm_eval(test_data, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e_word_tag_counts, e_tag_counts, lambda1, lambda2): # todo change signiture
+def hmm_eval(test_data, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e_word_tag_counts, e_tag_counts):
     """
     Receives: test data set and the parameters learned by hmm
     Returns an evaluation of the accuracy of hmm
@@ -130,7 +130,7 @@ def hmm_eval(test_data, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e
 
         ### YOUR CODE HERE
         pred_tag_seqs.append(tuple(hmm_viterbi(sent, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
-                e_word_tag_counts, e_tag_counts, lambda1, lambda2)))
+                e_word_tag_counts, e_tag_counts, 0.12, 0.6)))
         ### YOUR CODE HERE
 
     return evaluate_ner(gold_tag_seqs, pred_tag_seqs)
@@ -138,6 +138,7 @@ def hmm_eval(test_data, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e
 
 def lambdas_search(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
                    e_word_tag_counts, e_tag_counts, grid=True):
+    # need to add lambda1 and lambda2 parameters to hmm_eval
     maxf1 = 0
     maxl1 = -1
     maxl2 = -1
@@ -182,7 +183,7 @@ if __name__ == "__main__":
     total_tokens, q_tri_counts, q_bi_counts, q_uni_counts, e_word_tag_counts, e_tag_counts = hmm_train(train_sents)
     # best lambdas are 0.12, 0.6
     hmm_eval(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
-             e_word_tag_counts, e_tag_counts, 0.12, 0.6)
+             e_word_tag_counts, e_tag_counts)
 
     # unmark to do grid or random search
     # print(lambdas_search(dev_sents, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
