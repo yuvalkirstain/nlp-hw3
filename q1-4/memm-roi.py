@@ -90,84 +90,60 @@ def memm_greedy(sent, logreg, vec, index_to_tag_dict, extra_decoding_arguments):
         Receives: a sentence to tag and the parameters learned by memm
         Returns: predicted tags for the sentence
     """
-    predicted_tags = ["-"] * (len(sent))
+    predicted_tags = ["O"] * (len(sent))
     ### YOUR CODE HERE
-    prev_word = prev_prev_word = '<st>'
-    prev_tag = prev_prev_tag = '*'
-    for k in range(len(sent)):
-        curr_word = sent[k]
-        features = extract_features_base(curr_word, None, prev_word, prev_prev_word, prev_tag,
-                                         prev_prev_tag)
+    for i in range(len(sent)):
+        sentence = list(zip(sent, predicted_tags))
+        features = extract_features(sentence, i)
         vectorized_sent = vectorize_features(vec, features)
         index = logreg.predict(vectorized_sent)[0]
-        predicted_tags[k] = index_to_tag_dict[index]
-        prev_prev_tag = prev_tag
-        prev_tag = predicted_tags[k]
-        prev_prev_word = prev_word
-        prev_word = curr_word
+        predicted_tags[i] = index_to_tag_dict[index]
     ### YOUR CODE HERE
     return predicted_tags
-Q_CACHE = {}
+
 def memm_viterbi(sent, logreg, vec, index_to_tag_dict, extra_decoding_arguments):
     """
         Receives: a sentence to tag and the parameters learned by memm
         Returns: predicted tags for the sentence
     """
-    predicted_tags = ["-"] * (len(sent)) # todo change back
+    predicted_tags = ["O"] * (len(sent))
     ### YOUR CODE HERE
-    tag_to_index_dict = {tag : ind for ind, tag in index_to_tag_dict.items() if tag != '*'}
-    pi = defaultdict(lambda: defaultdict(lambda: float('-inf')))
-    pi[-1][('*', '*')] = 0  # for base case
-    bp = {}
-    l_sent = len(sent)
-    tags = tag_to_index_dict.keys()
-    # build pi, bp
-    prev_word = prev_prev_word = '<st>'
-    for k in range(l_sent):
-        bp[k] = {}
-        curr_word = sent[k]
-        for prev_prev_tag, prev_tag in pi[k - 1]:  # we don't iterate through all tags, just those that are a part of a possible path
-            p = pi[k - 1][(prev_prev_tag, prev_tag)]
-            if p <= float('-inf'):
-                continue
-            key = (curr_word, None, prev_word, '', prev_tag, '')
-            if key not in Q_CACHE:
-                features = extract_features_base(curr_word, None, prev_word, '', prev_tag, '')
+    num_tags = len(index_to_tag_dict) - 1
+    PI = np.zeros([len(sent), num_tags, num_tags])
+    BP_ix = np.zeros([len(sent), num_tags, num_tags])
+    for i in range(len(sent)):
+        q = np.zeros([num_tags, num_tags, num_tags])
+        for prev_tag_index in range(num_tags):
+            for prev_prev_tag_index in range(num_tags):
+                tags = ["O"] * (len(sent))
+                if i > 0:
+                    tags[i - 1] = index_to_tag_dict[prev_tag_index]
+                if i > 1:
+                    tags[i - 2] = index_to_tag_dict[prev_prev_tag_index]
+                sentence = list(zip(sent, tags))
+                features = extract_features(sentence, i)
                 vectorized_sent = vectorize_features(vec, features)
-                prediction = logreg.predict_proba(vectorized_sent)
-                Q_CACHE[key] = np.log(prediction[0])
-                prediction[prediction < -2] = float('-inf')  # pruning
-            for cur_tag in tags:
-                q = Q_CACHE[key][tag_to_index_dict[cur_tag]]
-                res = p + q
-                if res > pi[k][(prev_tag, cur_tag)]:
-                    pi[k][(prev_tag, cur_tag)] = res
-                    bp[k][(prev_tag, cur_tag)] = prev_prev_tag
-        # yuvalk - hack for case that all tags have zero prob
-        if len(bp[k]) == 0:
-            for (prev_prev_tag, prev_tag), res in pi[k - 1].items():
-                for cur_tag in tags:
-                    pi[k][(prev_tag, cur_tag)] = res
-                    bp[k][(prev_tag, cur_tag)] = 'O'
-        prev_prev_word = prev_word
-        prev_word = curr_word
-
-    # update last and before last
-    max_res = float('-inf')
-    for prev_tag, cur_tag in pi[l_sent - 1]:
-        res = pi[l_sent - 1][(prev_tag, cur_tag)]
-        if res > max_res:
-            max_res = res
-            predicted_tags[l_sent - 1] = cur_tag
-            if l_sent > 1:
-                predicted_tags[l_sent - 2] = prev_tag
-
-    # update the rest
-    for k in range(len(sent) - 3, -1, -1):
-        y_kp1 = predicted_tags[k + 1]
-        y_kp2 = predicted_tags[k + 2]
-        predicted_tags[k] = bp[k + 2][(y_kp1, y_kp2)]
-
+                q[prev_prev_tag_index, prev_tag_index, :] = logreg.predict_proba(vectorized_sent)
+        if i > 0:
+            last_PI = PI[i-1]
+        else:
+            last_PI = np.ones([num_tags, num_tags])
+        last_PI = np.repeat(last_PI[:, :, np.newaxis], num_tags, axis=2)
+        r = last_PI * q
+        BP_ix[i] = np.argmax(r, axis=0)
+        PI[i] = np.max(r, axis=0)
+    last_PI = PI[len(sent) - 1]
+    argmax = last_PI.argmax()
+    curr_tag_index = argmax % num_tags
+    prev_tag_index = int(argmax / num_tags)
+    predicted_tags[-1] = index_to_tag_dict[curr_tag_index]
+    if len(sent) > 1:
+        predicted_tags[-2] = index_to_tag_dict[prev_tag_index]
+    for i in range(len(sent) - 1, 1, -1):
+        prev_prev_tag_index = BP_ix[i, prev_tag_index, curr_tag_index]
+        predicted_tags[i - 2] = index_to_tag_dict[prev_prev_tag_index]
+        curr_tag_index = prev_tag_index
+        prev_tag_index = curr_tag_index
     ### YOUR CODE HERE
     return predicted_tags
 

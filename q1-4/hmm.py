@@ -43,7 +43,7 @@ def hmm_viterbi(sent, total_tokens, q_tri_counts, q_bi_counts, q_uni_counts,
         Receives: a sentence to tag and the parameters learned by hmm
         Returns: predicted tags for the sentence
     """
-    predicted_tags = ["-"] * (len(sent))
+    predicted_tags = ["-"] * (len(sent)) # todo change back to "O"
     ### YOUR CODE HERE
     lambda3 = 1 - (lambda1 + lambda2)
     tags = [key for key in q_uni_counts if q_uni_counts[key] > 0]
