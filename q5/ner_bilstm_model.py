@@ -81,7 +81,13 @@ class NerBiLstmModel(torch.nn.Module):
 
         self._dropout = torch.nn.Dropout(config.dropout)
         ### YOUR CODE HERE (3 lines)
-        raise NotImplementedError
+        self.embeddings = torch.nn.Embedding.from_pretrained(pretrained_embeddings, freeze=False)
+        self.lstm = torch.nn.LSTM(input_size=pretrained_embeddings.shape[1] * self.config.n_features,
+                                  hidden_size=int(config.hidden_size / 2),
+                                  bidirectional=True,
+                                  batch_first=True)
+        self.fc = torch.nn.Linear(config.hidden_size, config.n_classes)
+        self.softmax = torch.nn.Softmax(-1)
         ### END YOUR CODE
 
     def forward(self, sentences):
@@ -108,7 +114,13 @@ class NerBiLstmModel(torch.nn.Module):
         """
         batch_size, seq_length = sentences.shape[0], sentences.shape[1]
         ### YOUR CODE HERE (5-9 lines)
-        raise NotImplementedError
+        x = self.embeddings(sentences)
+        x = self._dropout(x)
+        x = x.view(batch_size, seq_length, -1)
+        x, _ = self.lstm(x)
+        x = self._dropout(x)
+        x = self.fc(x)
+        tag_probs = self.softmax(x)
         ### END YOUR CODE
         return tag_probs
 
@@ -125,7 +137,7 @@ class Trainer(TrainerBase):
         super(Trainer, self).__init__(model, config, helper, logger)
 
         ### YOUR CODE HERE (1 line)
-        raise NotImplementedError
+        self._loss_function = torch.nn.NLLLoss()
         ### END YOUR CODE
         self._optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
@@ -161,7 +173,11 @@ class Trainer(TrainerBase):
             loss: A 0-d tensor (scalar)
         """
         ### YOUR CODE HERE (3-6 lines)
-        raise NotImplementedError
+        masked_labels = labels.masked_fill(~masks, 0)
+        masks_repeated = masks.view(masks.shape[0], 1, masks.shape[1]).repeat(1, tag_probs.shape[2], 1)
+        tag_probs = torch.transpose(tag_probs, 1, 2)
+        tag_probs = torch.log(tag_probs)
+        masked_tag_probs = tag_probs.masked_fill(~masks_repeated, 0)
         ### END YOUR CODE
         loss = self._loss_function(masked_tag_probs, masked_labels)
         return loss
@@ -211,7 +227,14 @@ class DataPreprocessor(BaseDataPreprocessor):
 
         for sentence, labels in examples:
             ### YOUR CODE HERE (~5 lines)
-            raise NotImplementedError
+            sentence = sentence[:max_length]
+            labels = labels[:max_length]
+            mask = [True] * len(sentence)
+            num_pad = max_length - len(sentence)
+            sentence += [zero_vector] * num_pad
+            labels += [zero_label] * num_pad
+            mask += [False] * num_pad
+            ret.append((sentence, labels, mask))
             ### END YOUR CODE
         return ret
 
